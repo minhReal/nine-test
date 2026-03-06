@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>🔫 Nine-Ball Roulette</title>
+
+  <!-- Firebase SDK v10 Compat -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+
+  <style>
+    /* ============================================================
+       ROOT & RESET
+    ============================================================ */
+    :root {
+      --gold: #c9a84c;
+      --gold-dim: #7a6030;
+      --gold-bright: #f0d080;
+      --crimson: #8b1a1a;
+      --crimson-bright: #dd2222;
+      --safe: #1d7a42;
+      --safe-bright: #22dd66;
+      --dark:  #07070f;
+      --dark2: #0e0e1c;
+      --dark3: #17172a;
+      --dark4: #212136;
+      --text:  #e8dcc8;
+      --text-dim: #8a7a60;
+      --text-muted: #3e3428;
+      --border: rgba(201,168,76,.25);
+    }
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    html, body { height:100%; width:100%; overflow:hidden; }
+    body {
+      font-family:'IM Fell English', serif;
+      background: var(--dark);
+      color: var(--text);
+      position: relative;
+    }
+    body::after {
+      content:'';
+      position:fixed; inset:0;
+      background:
+        radial-gradient(ellipse 60% 50% at 15% 50%, rgba(139,26,26,.06) 0%, transparent 100%),
+        radial-gradient(ellipse 60% 50% at 85% 50%, rgba(201,168,76,.04) 0%, transparent 100%);
+      pointer-events:none; z-index:0;
+    }
+
+    /* ============================================================
+       SCREEN SYSTEM
+    ============================================================ */
+    .screen {
+      position:fixed; inset:0;
+      display:flex; flex-direction:column;
+      align-items:center; justify-content:center;
+      padding:16px 16px 24px;
+      opacity:0; pointer-events:none;
+      transition:opacity .3s ease;
+      z-index:1; overflow-y:auto;
+    }
+    .screen.active { opacity:1; pointer-events:all; }
+
+    /* ============================================================
+       TYPOGRAPHY
+    ============================================================ */
+    .title-main {
+      font-family:'Cinzel Decorative', serif;
+      font-size: clamp(1.6rem, 5.5vw, 2.8rem);
+      font-weight:900;
+      color: var(--gold);
+      text-shadow:0 0 28px rgba(201,168,76,.5), 0 2px 4px rgba(0,0,0,.9);
+      text-align:center; line-height:1.2;
+    }
+    .title-sub {
+      font-family:'Cinzel', serif;
+      font-size: clamp(.6rem, 1.8vw, .8rem);
+      color: var(--text-dim);
+      letter-spacing:.32em;
+      text-transform:uppercase;
+      margin-top:4px; text-align:center;
+    }
+    .label {
+      font-family:'Cinzel', serif;
+      font-size:.68rem; letter-spacing:.2em;
+      text-transform:uppercase; color:var(--text-dim);
+      margin-bottom:7px; display:block;
+    }
+
+    /* ============================================================
+       PANEL
+    ============================================================ */
+    .panel {
+      background: rgba(14,14,28,.97);
+      border:1px solid var(--border);
+      border-radius:4px; padding:20px;
+      width:100%; max-width:420px;
+      position:relative;
+    }
+    .panel::before {
+      content:'';
+      position:absolute; top:0; left:0; right:0; height:1px;
+      background:linear-gradient(90deg, transparent, var(--gold), transparent);
+    }
+
+    /* ============================================================
+       INPUTS & BUTTONS
+    ============================================================ */
+    .input-field {
+      width:100%;
+      background: rgba(255,255,255,.03);
+      border:1px solid rgba(201,168,76,.2);
+      border-radius:2px; padding:11px 14px;
+      color:var(--text);
+      font-family:'IM Fell English', serif; font-size:1rem;
+      outline:none; transition:border-color .2s;
+    }
+    .input-field:focus { border-color:var(--gold); box-shadow:0 0 10px rgba(201,168,76,.12); }
+    .input-field::placeholder { color:var(--text-muted); }
+
+    .btn {
+      width:100%; padding:13px 20px; border:none; border-radius:2px;
+      font-family:'Cinzel', serif; font-size:.8rem; font-weight:700;
+      letter-spacing:.14em; text-transform:uppercase;
+      cursor:pointer; transition:all .18s; position:relative;
+    }
+    .btn:disabled { opacity:.35; cursor:not-allowed; }
+    .btn-gold {
+      background:linear-gradient(135deg, #c9a84c, #8a6a20);
+      color:#06060e;
+    }
+    .btn-gold:hover:not(:disabled) {
+      background:linear-gradient(135deg, #f0d080, #c9a84c);
+      transform:translateY(-1px);
+      box-shadow:0 4px 18px rgba(201,168,76,.4);
+    }
+    .btn-crimson {
+      background:linear-gradient(135deg, #8b1a1a, #5a0808);
+      color:var(--text);
+    }
+    .btn-crimson:hover:not(:disabled) {
+      background:linear-gradient(135deg, #cc2222, #8b1a1a);
+      transform:translateY(-1px);
+      box-shadow:0 4px 18px rgba(204,34,34,.4);
+    }
+    .btn-ghost {
+      background:transparent;
+      border:1px solid var(--border);
+      color:var(--text-dim);
+    }
+    .btn-ghost:hover:not(:disabled) { border-color:var(--gold); color:var(--gold); }
+
+    .gap    { height:14px; }
+    .gap-sm { height:7px; }
+    .gap-lg { height:22px; }
+    .divider {
+      height:1px;
+      background:linear-gradient(90deg, transparent, var(--border), transparent);
+      margin:14px 0;
+    }
+
+    /* ============================================================
+       ROOM ID DISPLAY
+    ============================================================ */
+    .room-id-badge {
+      font-family:'Cinzel', serif; font-size:1.9rem; font-weight:700;
+      color:var(--gold); letter-spacing:.28em; text-align:center;
+      padding:10px 14px;
+      background:rgba(201,168,76,.06);
+      border:1px solid var(--border); border-radius:3px;
+      cursor:pointer; user-select:all;
+    }
+    .room-id-badge:active { background:rgba(201,168,76,.14); }
+
+    /* ============================================================
+       AVATAR / EMOJI
+    ============================================================ */
+    .avatar {
+      border-radius:50%; display:flex; align-items:center; justify-content:center;
+      flex-shrink:0; border:2px solid rgba(255,255,255,.15);
+    }
+    .emoji-grid {
+      display:grid; grid-template-columns:repeat(6,1fr); gap:5px;
+    }
+    .emoji-btn {
+      aspect-ratio:1; font-size:1.35rem;
+      display:flex; align-items:center; justify-content:center;
+      border-radius:50%; border:2px solid transparent;
+      cursor:pointer; background:rgba(255,255,255,.05);
+      transition:all .14s;
+    }
+    .emoji-btn:hover { transform:scale(1.12); }
+    .emoji-btn.sel { border-color:var(--gold); background:rgba(201,168,76,.18); }
+    .color-grid {
+      display:grid; grid-template-columns:repeat(8,1fr); gap:5px;
+    }
+    .color-btn {
+      aspect-ratio:1; border-radius:50%;
+      border:2px solid transparent; cursor:pointer; transition:all .14s;
+    }
+    .color-btn:hover { transform:scale(1.12); }
+    .color-btn.sel { border-color:#fff; transform:scale(1.14); box-shadow:0 0 8px rgba(255,255,255,.4); }
+
+    /* ============================================================
+       LOBBY
+    ============================================================ */
+    .player-list { display:flex; flex-direction:column; gap:7px; max-height:195px; overflow-y:auto; }
+    .player-item {
+      display:flex; align-items:center; gap:10px;
+      padding:7px 11px;
+      background:rgba(255,255,255,.025);
+      border:1px solid rgba(255,255,255,.05); border-radius:2px;
+    }
+    .player-item .pname { font-family:'Cinzel',serif; font-size:.82rem; flex:1; }
+    .host-badge {
+      font-family:'Cinzel',serif; font-size:.56rem; letter-spacing:.1em;
+      text-transform:uppercase; color:var(--gold);
+      background:rgba(201,168,76,.1);
+      border:1px solid rgba(201,168,76,.3);
+      padding:2px 7px; border-radius:10px;
+    }
+    .me-badge {
+      font-family:'Cinzel',serif; font-size:.56rem; letter-spacing:.05em;
+      text-transform:uppercase; color:var(--text-muted);
+    }
+    .settings-row {
+      display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;
+    }
+    .settings-label { font-family:'Cinzel',serif; font-size:.72rem; letter-spacing:.1em; color:var(--text-dim); }
+    .num-btn {
+      width:28px; height:28px;
+      background:rgba(255,255,255,.04);
+      border:1px solid var(--border); border-radius:2px;
+      color:var(--text); font-family:'Cinzel',serif; font-size:.78rem;
+      cursor:pointer; transition:all .14s;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .num-btn.active {
+      background:rgba(201,168,76,.18);
+      border-color:var(--gold); color:var(--gold);
+    }
+    .num-btn:disabled { opacity:.3; cursor:not-allowed; }
+
+    /* ============================================================
+       GAME SCREEN
+    ============================================================ */
+    #game-screen {
+      padding:10px 12px 16px;
+      justify-content:flex-start;
+    }
+    .game-layout {
+      width:100%; max-width:540px;
+      display:flex; flex-direction:column;
+      gap:8px; height:100%; overflow:hidden;
+    }
+    .game-header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:4px 2px;
+    }
+    .turn-indicator {
+      font-family:'Cinzel',serif; font-size:.72rem;
+      letter-spacing:.18em; text-transform:uppercase; color:var(--text-dim);
+    }
+    .turn-indicator span { color:var(--gold-bright); }
+    .chamber-counter { font-family:'Cinzel',serif; font-size:.66rem; color:var(--text-muted); }
+
+    /* Players row */
+    .players-row {
+      display:flex; gap:6px; overflow-x:auto; padding:2px 0;
+      scrollbar-width:none;
+    }
+    .players-row::-webkit-scrollbar { display:none; }
+    .player-chip {
+      display:flex; flex-direction:column; align-items:center;
+      gap:3px; min-width:52px; position:relative;
+    }
+    .chip-av {
+      width:46px; height:46px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      font-size:1.3rem; border:2px solid transparent;
+      transition:all .3s;
+    }
+    .player-chip.my-turn .chip-av {
+      border-color:var(--gold) !important;
+      box-shadow:0 0 14px rgba(201,168,76,.55);
+    }
+    .player-chip.dead .chip-av {
+      opacity:.25; filter:grayscale(1) brightness(.5);
+    }
+    .dead-x {
+      position:absolute; top:0; left:50%; transform:translateX(-50%);
+      font-size:1.5rem; line-height:46px;
+      color:var(--crimson-bright); text-shadow:0 0 10px rgba(221,34,34,.8);
+      pointer-events:none;
+    }
+    .chip-name {
+      font-family:'Cinzel',serif; font-size:.5rem;
+      letter-spacing:.04em; text-align:center; color:var(--text-dim);
+      white-space:nowrap; max-width:58px; overflow:hidden; text-overflow:ellipsis;
+    }
+    .player-chip.my-turn .chip-name { color:var(--gold); }
+
+    /* Canvas */
+    .cylinder-wrap {
+      flex:1; display:flex; align-items:center; justify-content:center;
+      min-height:0;
+    }
+    #cyl-canvas {
+      max-width:min(300px, 80vw);
+      max-height:min(300px, 40vh);
+      width:100%; height:auto;
+    }
+
+    /* Trigger */
+    .trigger-wrap {
+      display:flex; flex-direction:column; align-items:center; gap:6px;
+    }
+    #trigger-btn {
+      width:min(110px, 28vw);
+      height:min(110px, 28vw);
+      border-radius:50%;
+      border:3px solid var(--crimson-bright);
+      background:radial-gradient(circle at 40% 38%, #5c0a0a, #120000);
+      color:var(--text);
+      font-family:'Cinzel',serif; font-size:.72rem; font-weight:700;
+      letter-spacing:.08em; text-transform:uppercase;
+      cursor:pointer; transition:all .15s;
+      box-shadow:0 0 22px rgba(204,34,34,.18), inset 0 0 20px rgba(0,0,0,.6);
+    }
+    #trigger-btn:hover:not(:disabled) {
+      border-color:#ff4444;
+      box-shadow:0 0 32px rgba(221,34,34,.55), inset 0 0 20px rgba(0,0,0,.5);
+      transform:scale(1.05);
+    }
+    #trigger-btn:active:not(:disabled) { transform:scale(.93); }
+    #trigger-btn:disabled {
+      border-color:var(--text-muted);
+      background:radial-gradient(circle at 40% 38%, #1a1a1a, #080808);
+      color:var(--text-muted); cursor:not-allowed;
+    }
+    #wait-text {
+      font-family:'Cinzel',serif; font-size:.66rem; letter-spacing:.2em;
+      color:var(--text-muted); text-align:center;
+    }
+
+    /* ============================================================
+       RESULT OVERLAY  (BANG / CLICK)
+    ============================================================ */
+    #res-overlay {
+      position:fixed; inset:0;
+      background:rgba(0,0,0,.88);
+      display:flex; flex-direction:column;
+      align-items:center; justify-content:center;
+      z-index:200; opacity:0; pointer-events:none;
+      transition:opacity .25s;
+    }
+    #res-overlay.show { opacity:1; pointer-events:all; }
+    #res-text {
+      font-family:'Cinzel Decorative',serif;
+      font-size:clamp(3rem, 14vw, 7rem); font-weight:900;
+      letter-spacing:.08em;
+    }
+    #res-text.bang {
+      color:var(--crimson-bright);
+      text-shadow:0 0 40px rgba(221,34,34,.9), 0 0 80px rgba(221,34,34,.4);
+      animation:bangIn .45s cubic-bezier(.2,.8,.3,1);
+    }
+    #res-text.click {
+      color:var(--safe-bright);
+      text-shadow:0 0 40px rgba(34,221,102,.9);
+      animation:clickIn .3s ease-out;
+    }
+    @keyframes bangIn  { 0%{transform:scale(2.2);opacity:0} 60%{transform:scale(.92)} 100%{transform:scale(1);opacity:1} }
+    @keyframes clickIn { 0%{transform:scale(1.6);opacity:0} 100%{transform:scale(1);opacity:1} }
+    #res-sub {
+      font-family:'Cinzel',serif; font-size:.88rem;
+      letter-spacing:.22em; color:var(--text-dim);
+      margin-top:14px; text-align:center;
+    }
+
+    /* ============================================================
+       WINNER SCREEN
+    ============================================================ */
+    #winner-screen { gap:0; }
+    .winner-crown { font-size:2.4rem; text-align:center; margin-bottom:6px; }
+    .winner-av {
+      width:90px; height:90px;
+      border-radius:50%; font-size:2.6rem;
+      display:flex; align-items:center; justify-content:center;
+      border:3px solid var(--gold);
+      box-shadow:0 0 38px rgba(201,168,76,.55);
+      margin:0 auto 12px;
+    }
+    .winner-name {
+      font-family:'Cinzel',serif; font-size:1.4rem;
+      color:var(--gold); text-align:center; margin-bottom:4px;
+    }
+    .winner-sub { font-size:.85rem; color:var(--text-dim); text-align:center; }
+
+    /* ============================================================
+       TOAST
+    ============================================================ */
+    #toast {
+      position:fixed; bottom:28px; left:50%;
+      transform:translateX(-50%) translateY(16px);
+      background:rgba(14,14,28,.97);
+      border:1px solid var(--border);
+      padding:9px 18px; border-radius:20px;
+      font-family:'Cinzel',serif; font-size:.72rem; letter-spacing:.1em;
+      color:var(--text); opacity:0; transition:all .28s;
+      z-index:999; white-space:nowrap;
+      max-width:90vw; text-align:center;
+    }
+    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+    /* ============================================================
+       SCROLLBAR
+    ============================================================ */
+    ::-webkit-scrollbar { width:3px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:var(--gold-dim); border-radius:2px; }
+
+    /* ============================================================
+       SETUP SCREEN specific
+    ============================================================ */
+    .setup-list { padding-left:18px; font-size:.88rem; line-height:1.9; color:var(--text-dim); }
+    .setup-list a { color:var(--gold); }
+    code {
+      font-family:'Courier New',monospace;
+      background:rgba(255,255,255,.06); padding:1px 6px;
+      border-radius:2px; color:var(--gold); font-size:.78rem;
+    }
+    #cfg-textarea {
+      font-family:'Courier New',monospace; font-size:.72rem;
+      background:rgba(0,0,0,.35); border:1px solid rgba(201,168,76,.2);
+      border-radius:2px; color:#88dd88; padding:11px; width:100%;
+      height:150px; outline:none; resize:none; margin-top:8px;
+    }
+    .setup-tab-row { display:flex; gap:6px; margin-bottom:12px; }
+    .setup-tab {
+      flex:1; padding:8px; border:1px solid var(--border);
+      border-radius:2px; background:transparent;
+      font-family:'Cinzel',serif; font-size:.7rem; letter-spacing:.1em;
+      text-transform:uppercase; color:var(--text-dim); cursor:pointer;
+      transition:all .18s;
+    }
+    .setup-tab.active { background:rgba(201,168,76,.15); border-color:var(--gold); color:var(--gold); }
+
+    /* ============================================================
+       RESPONSIVE
+    ============================================================ */
+    @media (max-height:560px) {
+      .panel { padding:14px; }
+      .title-main { font-size:1.3rem; }
+      #trigger-btn { width:80px; height:80px; }
+      .chip-av { width:38px; height:38px; font-size:1.1rem; }
+      .dead-x { line-height:38px; font-size:1.3rem; }
+    }
+    @media (max-width:360px) {
+      .emoji-grid { grid-template-columns:repeat(5,1fr); }
+      .color-grid  { grid-template-columns:repeat(6,1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ============================================================
+     SETUP SCREEN
+============================================================ -->
+<div id="setup-screen" class="screen">
+  <div style="margin-bottom:18px; text-align:center;">
+    <div class="title-main">🔫 Nine-Ball</div>
+    <div class="title-sub">Roulette — Cài đặt Firebase</div>
+  </div>
+
+  <div class="panel" style="max-width:480px;">
+    <div class="setup-tab-row">
+      <button class="setup-tab active" onclick="switchSetupTab('guide')">Hướng dẫn</button>
+      <button class="setup-tab" onclick="switchSetupTab('paste')">Dán Config</button>
+    </div>
+
+    <div id="tab-guide">
+      <ol class="setup-list">
+        <li>Vào <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a></li>
+        <li>Tạo Project mới (hoặc dùng project có sẵn)</li>
+        <li><b>Authentication</b> → Sign-in method → <b>Anonymous</b> → Bật</li>
+        <li><b>Realtime Database</b> → Create database → chọn vùng gần nhất</li>
+        <li>Rules tab → dán: <code>{"rules":{".read":true,".write":true}}</code> → Publish</li>
+        <li>Project Settings ⚙️ → Your apps → Web → Đăng ký → copy <code>firebaseConfig</code></li>
+        <li>Bấm tab "<b>Dán Config</b>" và dán vào</li>
+      </ol>
+    </div>
+    <div id="tab-paste" style="display:none;">
+      <span class="label">Dán firebaseConfig JSON của bạn</span>
+      <textarea id="cfg-textarea" placeholder='{"apiKey":"AIza...","authDomain":"...","databaseURL":"https://...-rtdb.firebaseio.com","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}'></textarea>
+      <div class="gap-sm"></div>
+      <button class="btn btn-gold" onclick="applyConfig()">Kết nối & Chơi</button>
+    </div>
+
+    <div class="divider"></div>
+    <div style="font-size:.78rem; color:var(--text-muted); text-align:center;">
+      Config được lưu vào localStorage — chỉ cần cài 1 lần
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     PROFILE SCREEN
+============================================================ -->
+<div id="profile-screen" class="screen">
+  <div style="margin-bottom:16px; text-align:center;">
+    <div class="title-main">🔫 Nine-Ball</div>
+    <div class="title-sub">Roulette</div>
+  </div>
+  <div class="panel">
+    <span class="label">Tên của bạn *</span>
+    <input type="text" id="inp-name" class="input-field" placeholder="Nhập tên..." maxlength="14" autocomplete="off">
+    <div class="gap"></div>
+
+    <span class="label">Biểu tượng</span>
+    <div class="emoji-grid" id="emoji-grid"></div>
+    <div class="gap"></div>
+
+    <span class="label">Màu sắc</span>
+    <div class="color-grid" id="color-grid"></div>
+    <div class="gap"></div>
+
+    <div style="display:flex; align-items:center; gap:12px; padding:10px 0;">
+      <div id="av-preview" class="avatar" style="width:52px;height:52px;font-size:1.7rem;"></div>
+      <div>
+        <div id="av-preview-name" style="font-family:'Cinzel',serif;font-size:.9rem;"></div>
+        <div style="font-size:.75rem;color:var(--text-dim);">Xem trước</div>
+      </div>
+    </div>
+
+    <button class="btn btn-gold" onclick="saveProfile()">Xác nhận hồ sơ</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     MENU SCREEN
+============================================================ -->
+<div id="menu-screen" class="screen">
+  <div style="margin-bottom:20px; text-align:center;">
+    <div class="title-main">🔫 Nine-Ball</div>
+    <div class="title-sub">Roulette</div>
+  </div>
+
+  <div id="menu-me" style="display:flex;align-items:center;gap:10px;margin-bottom:18px;cursor:pointer;padding:8px 12px;border:1px solid var(--border);border-radius:3px;background:rgba(255,255,255,.02);" onclick="showScreen('profile-screen')">
+    <!-- avatar injected here -->
+  </div>
+
+  <div class="panel">
+    <button class="btn btn-gold" style="margin-bottom:10px;" onclick="doCreate()">Tạo phòng mới</button>
+    <div class="divider"></div>
+    <span class="label">Tham gia phòng</span>
+    <div style="display:flex;gap:7px;">
+      <input type="text" id="inp-join" class="input-field"
+        placeholder="Mã phòng (6 ký tự)..." maxlength="6"
+        style="letter-spacing:.22em;text-transform:uppercase;">
+      <button class="btn btn-crimson" style="width:auto;padding:11px 18px;" onclick="doJoin()">Vào</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     LOBBY SCREEN
+============================================================ -->
+<div id="lobby-screen" class="screen">
+  <div style="text-align:center;margin-bottom:14px;">
+    <div class="title-sub" style="margin-bottom:6px;">MÃ PHÒNG — bấm để sao chép</div>
+    <div id="lob-room-id" class="room-id-badge" onclick="copyRoomId()"></div>
+    <div style="font-size:.76rem;color:var(--text-dim);margin-top:5px;">Chia sẻ mã để mời bạn bè</div>
+  </div>
+
+  <div class="panel">
+    <span class="label">Người chơi (<span id="lob-count">0</span>/6)</span>
+    <div class="player-list" id="lob-players"></div>
+    <div class="divider"></div>
+
+    <span class="label">Cài đặt</span>
+    <div class="settings-row">
+      <span class="settings-label">Số viên đạn</span>
+      <div style="display:flex;gap:4px;" id="bullet-btns">
+        <button class="num-btn" data-v="1" onclick="setBullets(1)">1</button>
+        <button class="num-btn" data-v="2" onclick="setBullets(2)">2</button>
+        <button class="num-btn" data-v="3" onclick="setBullets(3)">3</button>
+      </div>
+    </div>
+
+    <div class="gap-lg"></div>
+    <button class="btn btn-gold" id="btn-start" onclick="doStart()" style="margin-bottom:7px;">Bắt đầu</button>
+    <button class="btn btn-ghost" onclick="doLeave()">Rời phòng</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     GAME SCREEN
+============================================================ -->
+<div id="game-screen" class="screen">
+  <div class="game-layout">
+    <div class="game-header">
+      <div class="turn-indicator">Lượt: <span id="turn-name">—</span></div>
+      <div class="chamber-counter" id="cham-count"></div>
+    </div>
+
+    <div class="players-row" id="g-players"></div>
+
+    <div class="cylinder-wrap">
+      <canvas id="cyl-canvas" width="300" height="300"></canvas>
+    </div>
+
+    <div class="trigger-wrap">
+      <button id="trigger-btn" onclick="doPull()">Kéo<br>Cò</button>
+      <div id="wait-text"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     WINNER SCREEN
+============================================================ -->
+<div id="winner-screen" class="screen">
+  <div class="winner-crown">👑</div>
+  <div class="winner-av" id="win-av"></div>
+  <div class="winner-name" id="win-name"></div>
+  <div class="winner-sub" id="win-sub"></div>
+  <div class="gap-lg"></div>
+  <div class="panel" style="max-width:300px;">
+    <button class="btn btn-gold" style="margin-bottom:7px;" onclick="backLobby()">Chơi lại</button>
+    <button class="btn btn-ghost" onclick="doLeave()">Rời phòng</button>
+  </div>
+</div>
+
+<!-- RESULT OVERLAY -->
+<div id="res-overlay">
+  <div id="res-text"></div>
+  <div id="res-sub"></div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- ============================================================
+     SCRIPTS
+============================================================ -->
+<script>
+/* ================================================================
+   CONSTANTS
+================================================================ */
+const EMOJIS = ['💀','👻','😈','🦊','🐺','🐱','🐉','🔥','⚡','👑','💎','🌟','🎭','🦅','🐍','🦁'];
+const COLORS  = ['#cc3333','#e07030','#d4b820','#33aa55','#3388cc','#8844cc','#cc44aa','#888888'];
+const MAX_PLAYERS = 6;
+
+/* ================================================================
+   STATE
+================================================================ */
+let fbApp=null, db=null, fbAuth=null;
+let uid=null;
+let roomId=null, roomRef=null;
+let isHost=false;
+let lastActTs=0;
+let cyl=null; // CylinderRenderer
+
+/* ================================================================
+   SETUP SCREEN
+================================================================ */
+function switchSetupTab(t){
+  document.querySelectorAll('.setup-tab').forEach((b,i)=>b.classList.toggle('active',
+    (t==='guide'&&i===0)||(t==='paste'&&i===1)));
+  document.getElementById('tab-guide').style.display=t==='guide'?'':'none';
+  document.getElementById('tab-paste').style.display=t==='paste'?'':'none';
+}
+
+function applyConfig(){
+  const raw=document.getElementById('cfg-textarea').value.trim();
+  let cfg;
+  try{ cfg=JSON.parse(raw); }
+  catch(e){ toast('JSON không hợp lệ'); return; }
+  if(!cfg.apiKey||!cfg.databaseURL){ toast('Thiếu apiKey hoặc databaseURL'); return; }
+  localStorage.setItem('nbr_cfg', JSON.stringify(cfg));
+  initFirebase(cfg);
+}
+
+function initFirebase(cfg){
+  try{
+    if(!fbApp) fbApp=firebase.initializeApp(cfg);
+    db=firebase.database();
+    fbAuth=firebase.auth();
+    fbAuth.signInAnonymously().then(u=>{
+      uid=u.user.uid;
+      const p=getProfile();
+      if(p?.name){ renderMenuMe(); showScreen('menu-screen'); }
+      else showScreen('profile-screen');
+    }).catch(e=>{ toast('Auth lỗi: '+e.code); showScreen('setup-screen'); });
+  }catch(e){ toast('Firebase lỗi: '+e.message); }
+}
+
+/* ================================================================
+   PROFILE
+================================================================ */
+let selEmoji=EMOJIS[0], selColor=COLORS[0];
+
+function getProfile(){ try{return JSON.parse(localStorage.getItem('nbr_profile'));}catch{return null;} }
+
+function initProfileUI(){
+  const p=getProfile();
+  if(p){ selEmoji=p.emoji||EMOJIS[0]; selColor=p.color||COLORS[0]; }
+
+  // Emoji grid
+  const eg=document.getElementById('emoji-grid');
+  eg.innerHTML='';
+  EMOJIS.forEach((e,i)=>{
+    const b=document.createElement('button');
+    b.className='emoji-btn'+(e===selEmoji?' sel':'');
+    b.textContent=e; b.setAttribute('aria-label',e);
+    b.onclick=()=>{
+      document.querySelectorAll('.emoji-btn').forEach(x=>x.classList.remove('sel'));
+      b.classList.add('sel'); selEmoji=e; updateAvPreview();
+    };
+    eg.appendChild(b);
+  });
+
+  // Color grid
+  const cg=document.getElementById('color-grid');
+  cg.innerHTML='';
+  COLORS.forEach((c,i)=>{
+    const b=document.createElement('button');
+    b.className='color-btn'+(c===selColor?' sel':'');
+    b.style.background=c; b.setAttribute('aria-label',c);
+    b.onclick=()=>{
+      document.querySelectorAll('.color-btn').forEach(x=>x.classList.remove('sel'));
+      b.classList.add('sel'); selColor=c; updateAvPreview();
+    };
+    cg.appendChild(b);
+  });
+
+  if(p?.name) document.getElementById('inp-name').value=p.name;
+  document.getElementById('inp-name').oninput=updateAvPreview;
+  updateAvPreview();
+}
+
+function updateAvPreview(){
+  const name=document.getElementById('inp-name').value||'Tên của bạn';
+  document.getElementById('av-preview-name').textContent=name;
+  const av=document.getElementById('av-preview');
+  av.textContent=selEmoji;
+  av.style.background=selColor+'33'; av.style.borderColor=selColor;
+}
+
+function saveProfile(){
+  const name=document.getElementById('inp-name').value.trim();
+  if(!name){ toast('Vui lòng nhập tên!'); return; }
+  localStorage.setItem('nbr_profile',JSON.stringify({name,emoji:selEmoji,color:selColor}));
+  renderMenuMe(); showScreen('menu-screen');
+}
+
+function renderMenuMe(){
+  const p=getProfile(); if(!p) return;
+  const el=document.getElementById('menu-me');
+  el.innerHTML=`
+    <div class="avatar" style="width:40px;height:40px;font-size:1.2rem;background:${p.color}33;border-color:${p.color};">${p.emoji}</div>
+    <div style="flex:1;">
+      <div style="font-family:'Cinzel',serif;font-size:.88rem;">${esc(p.name)}</div>
+      <div style="font-size:.72rem;color:var(--text-dim);">Bấm để đổi hồ sơ</div>
+    </div>
+    <div style="font-size:.72rem;color:var(--text-muted);">✏️</div>
+  `;
+}
+
+/* ================================================================
+   ROOM MANAGEMENT
+================================================================ */
+function genId(){
+  const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({length:6},()=>c[Math.floor(Math.random()*c.length)]).join('');
+}
+
+async function doCreate(){
+  const p=getProfile();
+  if(!p){ toast('Hãy tạo hồ sơ trước!'); return; }
+  const rid=genId();
+  try{
+    await db.ref('rooms/'+rid).set({
+      host:uid, status:'lobby',
+      settings:{bullets:1}, createdAt:Date.now(),
+      players:{ [uid]:{name:p.name,emoji:p.emoji,color:p.color,alive:true,joinedAt:Date.now()} }
+    });
+    enterRoom(rid);
+  }catch(e){ toast('Lỗi tạo phòng: '+e.message); }
+}
+
+async function doJoin(){
+  const p=getProfile();
+  if(!p){ toast('Hãy tạo hồ sơ trước!'); return; }
+  const rid=document.getElementById('inp-join').value.trim().toUpperCase();
+  if(rid.length!==6){ toast('Mã phòng phải có 6 ký tự!'); return; }
+  try{
+    const snap=await db.ref('rooms/'+rid).get();
+    if(!snap.exists()){ toast('Phòng không tồn tại!'); return; }
+    const room=snap.val();
+    if(room.status!=='lobby'){ toast('Trò chơi đã bắt đầu rồi!'); return; }
+    const cnt=Object.keys(room.players||{}).length;
+    if(cnt>=MAX_PLAYERS){ toast('Phòng đã đầy!'); return; }
+    await db.ref(`rooms/${rid}/players/${uid}`).set(
+      {name:p.name,emoji:p.emoji,color:p.color,alive:true,joinedAt:Date.now()}
+    );
+    enterRoom(rid);
+  }catch(e){ toast('Lỗi tham gia: '+e.message); }
+}
+
+function enterRoom(rid){
+  roomId=rid;
+  document.getElementById('lob-room-id').textContent=rid;
+  if(roomRef){ roomRef.off(); }
+  roomRef=db.ref('rooms/'+rid);
+  roomRef.on('value', snap=>{
+    if(!snap.exists()){ toast('Phòng đã bị xóa!'); forceLeave(); return; }
+    onRoomUpdate(snap.val());
+  });
+  showScreen('lobby-screen');
+}
+
+function onRoomUpdate(room){
+  isHost=(room.host===uid);
+  if(room.status==='lobby'){
+    renderLobby(room);
+    if(!document.getElementById('lobby-screen').classList.contains('active')) showScreen('lobby-screen');
+  } else if(room.status==='playing'){
+    if(!document.getElementById('game-screen').classList.contains('active')){
+      showScreen('game-screen');
+      cyl=new CylRenderer(document.getElementById('cyl-canvas'));
+    }
+    renderGame(room);
+  } else if(room.status==='finished'){
+    showWinner(room);
+  }
+}
+
+function renderLobby(room){
+  const players=room.players||{};
+  const sorted=Object.entries(players).sort((a,b)=>a[1].joinedAt-b[1].joinedAt);
+  document.getElementById('lob-count').textContent=sorted.length;
+
+  document.getElementById('lob-players').innerHTML=sorted.map(([id,p])=>`
+    <div class="player-item">
+      <div class="avatar" style="width:32px;height:32px;font-size:1rem;background:${p.color}33;border-color:${p.color};">${p.emoji}</div>
+      <span class="pname">${esc(p.name)}</span>
+      ${id===room.host?'<span class="host-badge">Chủ</span>':''}
+      ${id===uid?'<span class="me-badge">(bạn)</span>':''}
+    </div>
+  `).join('');
+
+  const bullets=(room.settings||{}).bullets||1;
+  document.querySelectorAll('.num-btn').forEach(b=>{
+    b.classList.toggle('active',parseInt(b.dataset.v)===bullets);
+    b.disabled=!isHost;
+  });
+
+  const startBtn=document.getElementById('btn-start');
+  if(isHost){
+    startBtn.style.display='block';
+    startBtn.disabled=sorted.length<2;
+    startBtn.textContent=sorted.length<2?'Cần ít nhất 2 người':'Bắt đầu trò chơi';
+  } else {
+    startBtn.style.display='none';
+  }
+}
+
+async function setBullets(n){
+  if(!isHost||!roomId) return;
+  await db.ref(`rooms/${roomId}/settings/bullets`).set(n);
+}
+
+async function doStart(){
+  if(!isHost||!roomId) return;
+  const snap=await db.ref('rooms/'+roomId).get();
+  const room=snap.val(); if(!room) return;
+  const players=Object.entries(room.players||{}).sort((a,b)=>a[1].joinedAt-b[1].joinedAt).map(([id])=>id);
+  if(players.length<2){ toast('Cần ít nhất 2 người!'); return; }
+
+  const bullets=(room.settings||{}).bullets||1;
+  const cylinder=makeCylinder(9,bullets);
+  const order=[...players].sort(()=>Math.random()-.5);
+
+  await db.ref('rooms/'+roomId).update({
+    status:'playing', cylinder, currentChamber:0,
+    currentPlayerIdx:0, playerOrder:order,
+    firedChambers:null, lastAction:null, winner:null
+  });
+}
+
+function makeCylinder(total,bullets){
+  const arr=new Array(total).fill(false);
+  const pos=[];
+  while(pos.length<bullets){
+    const p=Math.floor(Math.random()*total);
+    if(!pos.includes(p)) pos.push(p);
+  }
+  pos.forEach(p=>arr[p]=true);
+  return arr;
+}
+
+async function doLeave(){
+  await leaveRoom();
+  showScreen('menu-screen');
+  renderMenuMe();
+}
+
+async function forceLeave(){
+  if(roomRef){ roomRef.off(); roomRef=null; }
+  roomId=null; isHost=false;
+  showScreen('menu-screen');
+  renderMenuMe();
+}
+
+async function leaveRoom(){
+  if(!roomId||!uid) return;
+  try{
+    if(isHost){
+      const snap=await db.ref('rooms/'+roomId).get();
+      if(snap.exists()){
+        const others=Object.keys(snap.val().players||{}).filter(id=>id!==uid);
+        if(others.length>0) await db.ref(`rooms/${roomId}/host`).set(others[0]);
+        else { await db.ref('rooms/'+roomId).remove(); }
+      }
+    }
+    await db.ref(`rooms/${roomId}/players/${uid}`).remove();
+  }catch(e){}
+  if(roomRef){ roomRef.off(); roomRef=null; }
+  roomId=null; isHost=false;
+}
+
+function copyRoomId(){
+  const id=document.getElementById('lob-room-id').textContent;
+  navigator.clipboard?.writeText(id).then(()=>toast('Đã sao chép: '+id)).catch(()=>toast('Mã: '+id));
+}
+
+/* ================================================================
+   GAME RENDER
+================================================================ */
+function toArr(v){
+  if(!v) return [];
+  if(Array.isArray(v)) return v;
+  return Object.values(v);
+}
+
+function renderGame(room){
+  const {cylinder:rawCyl,currentChamber:cc,currentPlayerIdx:cpi,
+         playerOrder:rawOrder,players,firedChambers:rawFired,lastAction}=room;
+
+  const cylinder=toArr(rawCyl);
+  const order=toArr(rawOrder);
+  const fired=toArr(rawFired);
+  const chamberIdx=cc||0;
+
+  // Update cylinder renderer
+  if(cyl){
+    cyl.setChambers(cylinder, fired, chamberIdx);
+    cyl.draw();
+  }
+
+  // Players row
+  const gpEl=document.getElementById('g-players');
+  gpEl.innerHTML=order.map((id,i)=>{
+    const p=players?.[id]; if(!p) return '';
+    const isTurn=i===cpi;
+    const isDead=!p.alive;
+    const isMe=id===uid;
+    return `<div class="player-chip ${isTurn?'my-turn':''} ${isDead?'dead':''}">
+      <div class="chip-av" style="background:${p.color}33;border-color:${isTurn?'var(--gold)':p.color};">${p.emoji}</div>
+      ${isDead?'<div class="dead-x">✕</div>':''}
+      <div class="chip-name">${esc(p.name)}${isMe?' (tôi)':''}</div>
+    </div>`;
+  }).join('');
+
+  // Turn indicator
+  const curUid=order[cpi];
+  const curP=players?.[curUid];
+  document.getElementById('turn-name').textContent=curP?curP.name:'—';
+  document.getElementById('cham-count').textContent=`${fired.length}/9 đã bắn`;
+
+  // Trigger button
+  const myTurn=curUid===uid;
+  const btn=document.getElementById('trigger-btn');
+  btn.disabled=!myTurn;
+  document.getElementById('wait-text').textContent=
+    myTurn?'':`Đang chờ ${curP?curP.name:''}...`;
+
+  // Handle new action
+  if(lastAction&&lastAction.timestamp>lastActTs){
+    lastActTs=lastAction.timestamp;
+    showActionResult(lastAction, players||{});
+  }
+}
+
+let resTimer=null;
+function showActionResult(action, players){
+  const overlay=document.getElementById('res-overlay');
+  const rtEl=document.getElementById('res-text');
+  const rsEl=document.getElementById('res-sub');
+  const p=players[action.playerId];
+  const pname=p?p.name:'Người chơi';
+
+  if(action.type==='bang'){
+    rtEl.textContent='BANG!'; rtEl.className='bang';
+    rsEl.textContent=`${pname} đã bị loại! 💀`;
+  } else {
+    rtEl.textContent='CLICK'; rtEl.className='click';
+    rsEl.textContent=`${pname} may mắn thoát! 😮‍💨`;
+  }
+  overlay.classList.add('show');
+  clearTimeout(resTimer);
+  resTimer=setTimeout(()=>overlay.classList.remove('show'), 2000);
+
+  if(cyl) cyl.reveal(action.chamber, action.type==='bang');
+}
+
+/* ================================================================
+   PULL TRIGGER
+================================================================ */
+async function doPull(){
+  if(!roomId||!uid) return;
+  const snap=await db.ref('rooms/'+roomId).get();
+  const room=snap.val(); if(!room) return;
+
+  const order=toArr(room.playerOrder);
+  const cylinder=toArr(room.cylinder);
+  const fired=toArr(room.firedChambers);
+  const chamberIdx=room.currentChamber||0;
+  const playerIdx=room.currentPlayerIdx||0;
+
+  if(order[playerIdx]!==uid) return;
+
+  // Spin animation
+  if(cyl) await cyl.spin();
+
+  const isBang=cylinder[chamberIdx]===true;
+  const newFired=[...fired, chamberIdx];
+
+  const updates={};
+  updates[`rooms/${roomId}/firedChambers`]=newFired;
+  updates[`rooms/${roomId}/lastAction`]={
+    type:isBang?'bang':'click',
+    playerId:uid, chamber:chamberIdx,
+    timestamp:Date.now()
+  };
+
+  if(isBang){
+    updates[`rooms/${roomId}/players/${uid}/alive`]=false;
+    // Find alive players (excluding me)
+    const alive=order.filter((id,i)=>{
+      if(id===uid) return false;
+      return room.players[id]?.alive!==false;
+    });
+
+    if(alive.length<=1){
+      // Game over
+      updates[`rooms/${roomId}/status`]='finished';
+      updates[`rooms/${roomId}/winner`]=alive[0]||null;
+    } else {
+      // Find next alive idx
+      const nextIdx=findNextAlive(playerIdx, order, room.players, uid);
+      updates[`rooms/${roomId}/currentChamber`]=(chamberIdx+1)%9;
+      updates[`rooms/${roomId}/currentPlayerIdx`]=nextIdx;
+      // Respin if we've gone through all chambers
+      if((chamberIdx+1)%9===0 && newFired.length>=9){
+        updates[`rooms/${roomId}/cylinder`]=makeCylinder(9,(room.settings||{}).bullets||1);
+        updates[`rooms/${roomId}/firedChambers`]=[];
+      }
+    }
+  } else {
+    const nextIdx=findNextAlive(playerIdx, order, room.players, null);
+    updates[`rooms/${roomId}/currentChamber`]=(chamberIdx+1)%9;
+    updates[`rooms/${roomId}/currentPlayerIdx`]=nextIdx;
+    if((chamberIdx+1)%9===0 && newFired.length>=9){
+      updates[`rooms/${roomId}/cylinder`]=makeCylinder(9,(room.settings||{}).bullets||1);
+      updates[`rooms/${roomId}/firedChambers`]=[];
+    }
+  }
+
+  await db.ref('/').update(updates);
+}
+
+function findNextAlive(curIdx, order, players, excludeUid){
+  for(let i=1;i<=order.length;i++){
+    const idx=(curIdx+i)%order.length;
+    const id=order[idx];
+    if(id===excludeUid) continue;
+    if(players[id]?.alive!==false) return idx;
+  }
+  return (curIdx+1)%order.length;
+}
+
+/* ================================================================
+   WINNER
+================================================================ */
+function showWinner(room){
+  showScreen('winner-screen');
+  const wid=room.winner;
+  const p=wid?room.players?.[wid]:null;
+  if(p){
+    const av=document.getElementById('win-av');
+    av.textContent=p.emoji; av.style.background=p.color+'33'; av.style.borderColor=p.color;
+    document.getElementById('win-name').textContent=p.name;
+    document.getElementById('win-sub').textContent=wid===uid?'🎉 Bạn là người chiến thắng!':'Người sống sót cuối cùng!';
+  } else {
+    document.getElementById('win-av').textContent='💀';
+    document.getElementById('win-name').textContent='Không ai sống sót';
+    document.getElementById('win-sub').textContent='Trò chơi kết thúc';
+  }
+}
+
+async function backLobby(){
+  if(!isHost){ showScreen('lobby-screen'); return; }
+  if(!roomId) return;
+  const snap=await db.ref('rooms/'+roomId).get();
+  const room=snap.val(); if(!room) return;
+  const updates={};
+  Object.keys(room.players||{}).forEach(id=>{ updates[`rooms/${roomId}/players/${id}/alive`]=true; });
+  Object.assign(updates,{
+    [`rooms/${roomId}/status`]:'lobby',
+    [`rooms/${roomId}/cylinder`]:null,
+    [`rooms/${roomId}/currentChamber`]:0,
+    [`rooms/${roomId}/currentPlayerIdx`]:0,
+    [`rooms/${roomId}/playerOrder`]:null,
+    [`rooms/${roomId}/firedChambers`]:null,
+    [`rooms/${roomId}/lastAction`]:null,
+    [`rooms/${roomId}/winner`]:null
+  });
+  await db.ref('/').update(updates);
+  document.getElementById('lob-room-id').textContent=roomId;
+}
+
+/* ================================================================
+   CYLINDER RENDERER
+================================================================ */
+class CylRenderer {
+  constructor(canvas){
+    this.cv=canvas;
+    this.cx=canvas.getContext('2d');
+    this.N=9;
+    this.cylinder=new Array(9).fill(false);
+    this.fired=[];
+    this.cur=0;
+    this.rot=0;
+    this.revealed={}; // idx -> 'bullet'|'empty'
+  }
+
+  setChambers(cylinder, fired, cur){
+    this.cylinder=cylinder;
+    this.fired=fired;
+    this.cur=cur;
+    // sync revealed from fired history
+    fired.forEach(idx=>{
+      if(this.revealed[idx]===undefined)
+        this.revealed[idx]=cylinder[idx]?'bullet':'empty';
+    });
+  }
+
+  reveal(idx, isBullet){
+    this.revealed[idx]=isBullet?'bullet':'empty';
+    this.draw();
+  }
+
+  draw(){
+    const cv=this.cv, ctx=this.cx;
+    const S=cv.width, cx=S/2, cy=S/2;
+    const R=S*.43, ringR=R*.67, cR=R*.125;
+    ctx.clearRect(0,0,S,S);
+
+    ctx.save();
+    ctx.translate(cx,cy);
+    ctx.rotate(this.rot);
+
+    /* ── Cylinder body ── */
+    const metal=ctx.createRadialGradient(-R*.18,-R*.18,0,0,0,R);
+    metal.addColorStop(0,'#5c5c70');
+    metal.addColorStop(.55,'#27273a');
+    metal.addColorStop(1,'#101018');
+    ctx.beginPath(); ctx.arc(0,0,R,0,Math.PI*2);
+    ctx.fillStyle=metal; ctx.fill();
+    ctx.strokeStyle='#44445a'; ctx.lineWidth=2; ctx.stroke();
+
+    /* ── Highlight arc ── */
+    ctx.beginPath(); ctx.arc(0,0,R-2,-Math.PI*.8,-Math.PI*.2);
+    ctx.strokeStyle='rgba(200,200,220,.12)'; ctx.lineWidth=7; ctx.stroke();
+
+    /* ── Chambers ── */
+    for(let i=0;i<this.N;i++){
+      const ang=(i/this.N)*Math.PI*2-Math.PI/2;
+      const x=Math.cos(ang)*ringR, y=Math.sin(ang)*ringR;
+      const isCur=i===this.cur;
+      const rev=this.revealed[i];
+
+      // shadow
+      ctx.beginPath(); ctx.arc(x+1.5,y+2,cR,0,Math.PI*2);
+      ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fill();
+
+      // chamber fill
+      ctx.beginPath(); ctx.arc(x,y,cR,0,Math.PI*2);
+      if(rev==='bullet'){
+        const g=ctx.createRadialGradient(x,y,0,x,y,cR);
+        g.addColorStop(0,'#cc4444'); g.addColorStop(1,'#3a0000');
+        ctx.fillStyle=g;
+      } else if(rev==='empty'){
+        const g=ctx.createRadialGradient(x-cR*.3,y-cR*.3,0,x,y,cR);
+        g.addColorStop(0,'#191926'); g.addColorStop(1,'#06060e');
+        ctx.fillStyle=g;
+      } else {
+        const g=ctx.createRadialGradient(x-cR*.25,y-cR*.25,0,x,y,cR);
+        g.addColorStop(0,'#383848'); g.addColorStop(1,'#181828');
+        ctx.fillStyle=g;
+      }
+      ctx.fill();
+
+      // inner highlight
+      ctx.beginPath(); ctx.arc(x-cR*.32,y-cR*.32,cR*.22,0,Math.PI*2);
+      ctx.fillStyle=rev==='bullet'?'rgba(255,120,120,.2)':'rgba(255,255,255,.05)';
+      ctx.fill();
+
+      // bullet center dot
+      if(rev==='bullet'){
+        ctx.beginPath(); ctx.arc(x,y,cR*.35,0,Math.PI*2);
+        ctx.fillStyle='#ffbb44'; ctx.fill();
+        // glow
+        ctx.beginPath(); ctx.arc(x,y,cR*.38,0,Math.PI*2);
+        ctx.strokeStyle='rgba(255,180,50,.5)'; ctx.lineWidth=2; ctx.stroke();
+      }
+
+      // chamber border
+      ctx.beginPath(); ctx.arc(x,y,cR,0,Math.PI*2);
+      ctx.strokeStyle=isCur?'#c9a84c':(rev==='bullet'?'#882222':'rgba(255,255,255,.08)');
+      ctx.lineWidth=isCur?2.5:1; ctx.stroke();
+
+      // current dashed ring
+      if(isCur){
+        ctx.beginPath(); ctx.arc(x,y,cR+5,0,Math.PI*2);
+        ctx.strokeStyle='rgba(201,168,76,.55)'; ctx.lineWidth=1.5;
+        ctx.setLineDash([3,3]); ctx.stroke(); ctx.setLineDash([]);
+      }
+    }
+
+    /* ── Center pin ── */
+    const pin=ctx.createRadialGradient(-3,-3,0,0,0,R*.1);
+    pin.addColorStop(0,'#aaaacc'); pin.addColorStop(1,'#444455');
+    ctx.beginPath(); ctx.arc(0,0,R*.1,0,Math.PI*2);
+    ctx.fillStyle=pin; ctx.fill();
+    ctx.strokeStyle='#666'; ctx.lineWidth=1; ctx.stroke();
+
+    ctx.restore();
+
+    /* ── Arrow pointer (fixed, outside rotation) ── */
+    const arrowY=cy-R-14;
+    ctx.save(); ctx.translate(cx,arrowY);
+    ctx.beginPath(); ctx.moveTo(0,-7); ctx.lineTo(-5.5,5); ctx.lineTo(5.5,5); ctx.closePath();
+    ctx.fillStyle='#c9a84c'; ctx.fill();
+    ctx.restore();
+  }
+
+  async spin(){
+    return new Promise(res=>{
+      const start=this.rot;
+      const adv=(2*Math.PI)/this.N;
+      const target=start+adv;
+      const dur=560, t0=performance.now();
+      const step=(now)=>{
+        const t=Math.min((now-t0)/dur,1);
+        const e=1-Math.pow(1-t,3);
+        this.rot=start+adv*e; this.draw();
+        if(t<1) requestAnimationFrame(step);
+        else { this.rot=target; res(); }
+      };
+      requestAnimationFrame(step);
+    });
+  }
+}
+
+/* ================================================================
+   UI HELPERS
+================================================================ */
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.classList.add('active');
+  if(id==='profile-screen') initProfileUI();
+}
+
+function esc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+let toastT=null;
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  clearTimeout(toastT);
+  toastT=setTimeout(()=>el.classList.remove('show'),2800);
+}
+
+/* ================================================================
+   MISC
+================================================================ */
+document.getElementById('inp-join').addEventListener('input',function(){ this.value=this.value.toUpperCase(); });
+document.getElementById('inp-join').addEventListener('keydown',e=>{ if(e.key==='Enter') doJoin(); });
+
+/* ================================================================
+   BOOT
+================================================================ */
+(function(){
+  const cfg=JSON.parse(localStorage.getItem('nbr_cfg')||'null');
+  if(cfg) initFirebase(cfg);
+  else showScreen('setup-screen');
+})();
+
+window.addEventListener('beforeunload',()=>{ if(roomId) leaveRoom(); });
+</script>
+</body>
+</html>
