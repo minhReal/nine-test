@@ -69,23 +69,24 @@ input[type=range]{width:100%;accent-color:#c9a84c;cursor:pointer;}
 .rid:hover{border-color:#c9a84c;}
 #sc-game{padding:8px;justify-content:flex-start;overflow:hidden;}
 .glayout{width:100%;max-width:760px;display:flex;flex-direction:column;gap:8px;height:100%;}
-.prow{display:flex;gap:6px;overflow-x:auto;padding:2px 0;scrollbar-width:none;flex-shrink:0;}
-.prow::-webkit-scrollbar{display:none;}
+.prow{display:flex;gap:6px;flex-wrap:wrap;padding:2px 0;flex-shrink:0;}
 .pc{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:50px;position:relative;}
-.cav{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.15rem;border:2px solid transparent;transition:all .25s;flex-shrink:0;}
-.pc.act .cav{border-color:#c9a84c!important;box-shadow:0 0 12px rgba(201,168,76,.5);}
-.pc.dead .cav{opacity:.18;filter:grayscale(1);}
-.dx{position:absolute;top:0;left:50%;transform:translateX(-50%);font-size:1.3rem;line-height:42px;color:#cc2222;pointer-events:none;}
-.cn{font-size:.44rem;letter-spacing:.04em;text-align:center;color:#2a2a3a;white-space:nowrap;max-width:56px;overflow:hidden;text-overflow:ellipsis;}
-.pc.act .cn{color:#c9a84c;}
-.bl_{font-size:.38rem;color:#1a1a2a;text-transform:uppercase;}
+.cav{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.2rem;border:2px solid transparent;transition:all .25s;flex-shrink:0;}
+#game-exit-btn{position:absolute;top:8px;right:8px;background:transparent;border:1px solid #2a2a3a;color:#555;font-family:inherit;font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;padding:5px 10px;border-radius:5px;cursor:pointer;z-index:10;transition:all .15s;}
+#game-exit-btn:hover{border-color:#cc4444;color:#cc4444;}
+.pc.act .cav{border-color:#22cc66!important;box-shadow:0 0 14px rgba(34,204,102,.6);}
+.pc.dead .cav{opacity:.2;filter:grayscale(1);}
+.dx{position:absolute;top:0;left:50%;transform:translateX(-50%);font-size:1.4rem;line-height:46px;color:#cc2222;pointer-events:none;}
+.cn{font-size:.52rem;letter-spacing:.03em;text-align:center;color:#aaa;white-space:nowrap;max-width:58px;overflow:hidden;text-overflow:ellipsis;}
+.pc.act .cn{color:#22cc66;font-weight:600;}
+.bl_{font-size:.42rem;color:#555;text-transform:uppercase;}
 .cv-wrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;}
 #pool-cv{display:block;width:100%;height:100%;object-fit:contain;cursor:crosshair;}
 .ctrl{display:flex;align-items:center;gap:10px;padding:4px 0;flex-shrink:0;}
 .power-wrap{flex:1;display:flex;flex-direction:column;gap:3px;}
-.power-label{font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:#333;display:flex;justify-content:space-between;}
+.power-label{font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:#aaa;display:flex;justify-content:space-between;}
 #shoot-btn{width:100px;flex-shrink:0;padding:10px 8px;font-size:.72rem;}
-#turn-info{font-size:.6rem;letter-spacing:.1em;color:#333;text-align:center;min-height:1em;}
+#turn-info{font-size:.64rem;letter-spacing:.08em;color:#aaa;text-align:center;min-height:1em;}
 #rlt-phase{display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;flex:1;}
 #rlt-title{font-size:.84rem;font-weight:700;color:#c9a84c;text-align:center;letter-spacing:.06em;}
 #rlt-sub{font-size:.66rem;color:#444;text-align:center;}
@@ -233,7 +234,8 @@ input[type=range]{width:100%;accent-color:#c9a84c;cursor:pointer;}
   </div>
 </div>
 
-<div id="sc-game" class="sc">
+<div id="sc-game" class="sc" style="position:relative;">
+  <button id="game-exit-btn" onclick="exitGame()">✕ Thoát</button>
   <div class="glayout">
     <div class="prow" id="g-players"></div>
     <div class="cv-wrap" id="pool-phase">
@@ -431,6 +433,21 @@ function setupCanvasEvents(){
   cv.onmousemove=aim;
   cv.ontouchmove=e=>{e.preventDefault();aim(e.touches[0]);};
   cv.ontouchstart=e=>{e.preventDefault();aim(e.touches[0]);};
+  cv.onwheel=e=>{
+    if(G.phase!=='pool'||G.shooting||G.busy)return;
+    e.preventDefault();
+    const delta=e.deltaY>0?-3:3;
+    const sl=document.getElementById('pow-sl');
+    const nv=Math.max(5,Math.min(100,parseInt(sl.value)+delta));
+    sl.value=nv;onPow(nv);renderPool();
+  };
+}
+
+function exitGame(){
+  clearTimeout(botTmr);
+  if(animId){cancelAnimationFrame(animId);animId=null;}
+  if(soloMode){soloMode=false;showSc('sc-menu');renderMe();}
+  else{leaveRoom().then(()=>{showSc('sc-menu');renderMe();});}
 }
 
 function cvPos(e,cv){
@@ -609,7 +626,7 @@ function doBotShot(){
 function renderPoolChips(){
   document.getElementById('g-players').innerHTML=G.players.map((p,i)=>`
     <div class="pc ${i===G.curIdx&&G.phase==='pool'?'act':''} ${!p.alive?'dead':''}">
-      <div class="cav" style="background:${p.color}22;border-color:${i===G.curIdx&&G.phase==='pool'?'#c9a84c':p.color};">${p.emoji}</div>
+      <div class="cav" style="background:${p.color}22;border-color:${i===G.curIdx&&G.phase==='pool'?'#22cc66':p.color+'88'};">${p.emoji}</div>
       ${!p.alive?'<div class="dx">✕</div>':''}
       <div class="cn">${esc(p.name)}</div>
       ${p.isBot?'<div class="bl_">BOT</div>':''}
@@ -659,19 +676,45 @@ function renderPool(){
   if(G.phase==='pool'&&!G.shooting){
     const cb=G.balls[0];
     if(cb&&!cb.pocketed){
-      const len=100;
-      ctx.strokeStyle='rgba(255,255,255,.3)';ctx.lineWidth=1;ctx.setLineDash([5,5]);
+      const aimLen=120;
+      ctx.strokeStyle='rgba(255,255,255,.22)';ctx.lineWidth=1;ctx.setLineDash([5,5]);
       ctx.beginPath();ctx.moveTo(cb.x,cb.y);
-      ctx.lineTo(cb.x+Math.cos(G.aimAngle)*len,cb.y+Math.sin(G.aimAngle)*len);
+      ctx.lineTo(cb.x+Math.cos(G.aimAngle)*aimLen,cb.y+Math.sin(G.aimAngle)*aimLen);
       ctx.stroke();ctx.setLineDash([]);
-      const dist=18+G.power*16;
-      const sx=cb.x-Math.cos(G.aimAngle)*dist,sy=cb.y-Math.sin(G.aimAngle)*dist;
-      const ex=sx-Math.cos(G.aimAngle)*90,ey=sy-Math.sin(G.aimAngle)*90;
-      ctx.lineWidth=6;ctx.strokeStyle='#6b4010';ctx.lineCap='round';
-      ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex,ey);ctx.stroke();
-      ctx.lineWidth=3;ctx.strokeStyle='#c9a84c';
-      ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex,ey);ctx.stroke();
-      ctx.lineCap='butt';
+
+      const pullback=G.power*38;
+      const tipDist=14;
+      const sx=cb.x-Math.cos(G.aimAngle)*(tipDist+pullback);
+      const sy=cb.y-Math.sin(G.aimAngle)*(tipDist+pullback);
+      const ex=sx-Math.cos(G.aimAngle)*110;
+      const ey=sy-Math.sin(G.aimAngle)*110;
+      const px=sx-Math.cos(G.aimAngle)*30;
+      const py=sy-Math.sin(G.aimAngle)*30;
+      const ang=G.aimAngle;
+      const nx=-Math.sin(ang),ny=Math.cos(ang);
+
+      ctx.save();
+      const cueGrad=ctx.createLinearGradient(sx,sy,ex,ey);
+      cueGrad.addColorStop(0,'#e8d090');
+      cueGrad.addColorStop(0.15,'#c9a84c');
+      cueGrad.addColorStop(0.5,'#8b5e1a');
+      cueGrad.addColorStop(1,'#4a2e08');
+      ctx.beginPath();
+      ctx.moveTo(sx+nx*2,sy+ny*2);
+      ctx.lineTo(ex+nx*5,ey+ny*5);
+      ctx.lineTo(ex-nx*5,ey-ny*5);
+      ctx.lineTo(sx-nx*2,sy-ny*2);
+      ctx.closePath();
+      ctx.fillStyle=cueGrad;ctx.fill();
+      ctx.strokeStyle='rgba(0,0,0,.3)';ctx.lineWidth=.5;ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(sx+nx*2,sy+ny*2);
+      ctx.lineTo(px+nx*2.5,py+ny*2.5);
+      ctx.lineTo(px-nx*2.5,py-ny*2.5);
+      ctx.lineTo(sx-nx*2,sy-ny*2);
+      ctx.closePath();
+      ctx.fillStyle='#4fc3f7';ctx.fill();
+      ctx.restore();
     }
   }
 }
