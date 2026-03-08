@@ -87,20 +87,19 @@ input[type=range]{width:100%;accent-color:#c9a84c;cursor:pointer;}
 .power-label{font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:#aaa;display:flex;justify-content:space-between;}
 #shoot-btn{width:100px;flex-shrink:0;padding:10px 8px;font-size:.72rem;}
 #turn-info{font-size:.64rem;letter-spacing:.08em;color:#aaa;text-align:center;min-height:1em;}
-#rlt-phase{display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;flex:1;}
-#rlt-title{font-size:.84rem;font-weight:700;color:#c9a84c;text-align:center;letter-spacing:.06em;}
-#rlt-sub{font-size:.66rem;color:#444;text-align:center;}
-#rlt-cv{max-width:min(260px,70vw);max-height:min(260px,35vh);}
-#pull-btn{width:min(100px,25vw);height:min(100px,25vw);border-radius:50%;border:2px solid #771a1a;background:radial-gradient(circle at 38% 36%,#420707,#0c0000);color:#bbb;font-family:inherit;font-size:.66rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:all .14s;box-shadow:0 0 16px rgba(160,20,20,.12);}
-#pull-btn:hover:not(:disabled){border-color:#cc2222;box-shadow:0 0 26px rgba(204,34,34,.35);transform:scale(1.04);}
+#rlt-phase{display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;flex:1;padding:8px;}
+#rlt-title{font-size:.9rem;font-weight:700;color:#c9a84c;text-align:center;letter-spacing:.04em;line-height:1.6;}
+#rlt-sub{font-size:.72rem;color:#bbb;text-align:center;line-height:1.8;padding:12px 16px;background:#0a0006;border:1px solid #3a0a0a;border-radius:10px;width:100%;}
+#rlt-cv{max-width:min(200px,55vw);max-height:min(200px,28vh);}
+#pull-btn{width:min(110px,26vw);height:min(110px,26vw);border-radius:50%;border:3px solid #aa2222;background:radial-gradient(circle at 38% 36%,#5a0a0a,#0c0000);color:#ffaaaa;font-family:inherit;font-size:.72rem;font-weight:700;letter-spacing:.04em;cursor:pointer;transition:all .14s;box-shadow:0 0 30px rgba(200,30,30,.3);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;}
+#pull-btn:hover:not(:disabled){border-color:#ff3333;box-shadow:0 0 44px rgba(255,50,50,.55);transform:scale(1.07);}
 #pull-btn:active:not(:disabled){transform:scale(.91);}
-#pull-btn:disabled{border-color:#1e1e1e;background:radial-gradient(circle at 38% 36%,#0f0f0f,#060606);color:#1e1e1e;cursor:not-allowed;}
-#pull-wait{font-size:.66rem;letter-spacing:.1em;color:#aaa;text-align:center;min-height:1.1em;}
+#pull-btn:disabled{border-color:#1e1e1e;background:radial-gradient(circle at 38% 36%,#0f0f0f,#060606);color:#333;cursor:not-allowed;box-shadow:none;}
+#pull-wait{font-size:.64rem;color:#aaa;text-align:center;min-height:2em;line-height:1.7;}
 .dots{display:inline-flex;gap:3px;align-items:center;vertical-align:middle;margin-left:4px;}
 .dot{width:4px;height:4px;border-radius:50%;background:#666;animation:bl 1s infinite;}
 .dot:nth-child(2){animation-delay:.2s;}.dot:nth-child(3){animation-delay:.4s;}
 @keyframes bl{0%,80%,100%{opacity:.1;}40%{opacity:1;}}
-#rlt-sub{font-size:.68rem;color:#888;text-align:center;}
 #ov{position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;opacity:0;pointer-events:none;transition:opacity .2s;}
 #ov.on{opacity:1;pointer-events:all;}
 #ovt{font-size:clamp(2.6rem,12vw,6rem);font-weight:700;letter-spacing:.06em;}
@@ -268,7 +267,7 @@ input[type=range]{width:100%;accent-color:#c9a84c;cursor:pointer;}
       <div id="rlt-title"></div>
       <div id="rlt-sub"></div>
       <canvas id="rlt-cv" width="280" height="280"></canvas>
-      <button id="pull-btn" onclick="doPull()">Kéo<br>Cò</button>
+      <button id="pull-btn" onclick="doPull()">🔫<span style="font-size:.58rem;display:block;margin-top:4px;">KÉO CÒ</span></button>
       <div id="pull-wait"></div>
     </div>
     <div class="ctrl" id="pool-ctrl">
@@ -724,6 +723,17 @@ function stepPhysics(){
   return jp;
 }
 
+function getEffectiveGoal(){
+  // advance currentGoal to next ball that still exists on table
+  let g=G.currentGoal||1;
+  for(let i=0;i<9;i++){
+    const exists=G.balls.some(b=>b.num===g&&!b.pocketed);
+    if(exists)return g;
+    g=g>=9?9:g+1;
+  }
+  return 9;
+}
+
 function afterShot(){
   G.shooting=false;
   const cue=G.pocketedThisTurn.includes(0);
@@ -731,38 +741,55 @@ function afterShot(){
     const cb=G.balls[0];cb.pocketed=false;cb.vx=0;cb.vy=0;
     cb.x=CUE_X;cb.y=CUE_Y;
   }
+
+  // auto-advance goal to next existing ball (skip already-pocketed)
+  G.currentGoal=getEffectiveGoal();
+
   const curP=G.players[G.curIdx];
-  const goalHit=G.pocketedThisTurn.includes(G.currentGoal);
-  const wrongBall=G.firstHitBall>0&&G.firstHitBall!==G.currentGoal;
+
+  // find next alive player index
+  function nextAliveIdx(){
+    let n=(G.curIdx+1)%G.players.length,c=0;
+    while(!G.players[n].alive&&c<G.players.length){n=(n+1)%G.players.length;c++;}
+    return n;
+  }
+
   if(cue){
     G.ballInHand=true;
-    const nextN=(G.curIdx+1)%G.players.length;
+    const nextN=nextAliveIdx();
     const nextP=G.players[nextN];
     toast(`⚪ Cào bi! ${nextP?nextP.name:''} được đặt bi trắng`);
     advanceTurn();
     return;
   }
-  if(wrongBall&&G.firstHitBall!==0){
+
+  const wrongBall=G.firstHitBall>0&&G.firstHitBall!==G.currentGoal;
+  if(wrongBall){
     toast(`❌ ${curP?curP.name:''} bắn nhầm bi! Phải kéo cò...`);
     G.rltIdx=G.curIdx;G.phase='roulette';
     renderPoolChips();
-    showRltPhase();
+    showRltPhase('wrong');
     return;
   }
+
+  const goalHit=G.pocketedThisTurn.includes(G.currentGoal);
   if(goalHit){
     if(curP)curP.score=(curP.score||0)+1;
     if(G.currentGoal===9){
+      // Player who pocketed 9 is SAFE — NEXT player faces roulette
       sndGoal();
-      toast(`\uD83D\uDCA3 ${curP?curP.name:''} bắn bi số 9 vào lỗ!`);
-      G.rltIdx=G.curIdx;G.phase='roulette';
+      const victim=nextAliveIdx();
+      G.rltIdx=victim;G.phase='roulette';
       G.currentGoal=1;
+      G.curIdx=victim; // set so showRltPhase knows who it is
       renderPoolChips();
-      showRltPhase();
+      showRltPhase('nine',curP);
     }else{
       sndGoal();
       const prev=G.currentGoal;
       G.currentGoal=getNextGoal(G.currentGoal);
-      toast(`\u2705 Bi số ${prev} vào lỗ! Tiếp theo: bi số ${G.currentGoal}`);
+      G.currentGoal=getEffectiveGoal();
+      toast(`✅ Bi ${prev} vào lỗ! Tiếp theo: bi số ${G.currentGoal}`);
       renderPoolChips();
       advanceTurn();
     }
@@ -797,19 +824,50 @@ function showPoolPhase(){
     document.getElementById('turn-info').textContent=p?(isMyTurn?'Lượt của bạn — hãy bắn!':`${p.name} đang suy nghĩ...`):'';
 }
 
-function showRltPhase(){
+function showRltPhase(reason, shooter){
   document.getElementById('pool-phase').style.display='none';
   document.getElementById('pool-ctrl').style.display='none';
   const rp=document.getElementById('rlt-phase');rp.style.display='flex';
-  const p=G.players[G.rltIdx];
-  document.getElementById('rlt-title').textContent=`💣 ${p.name} bắn bi số 9 vào lỗ!`;
-  document.getElementById('rlt-sub').textContent='Phải cầm súng bắn vào đầu...';
+  const victim=G.players[G.rltIdx];
+  let titleHTML, subHTML;
+  if(reason==='nine'){
+    titleHTML=
+      `<span style="font-size:1.3rem;display:block;">💥 Bi số 9 vào lỗ!</span>`+
+      `<span style="font-size:.82rem;color:#aaa;display:block;margin-top:4px;">`+
+      `${esc(shooter?shooter.name:'???')} bắn → ${esc(victim.name)} chịu phạt</span>`;
+    subHTML=
+      `<span style="font-size:1.5rem;">🔫</span><br>`+
+      `<span style="color:#cc4444;font-weight:700;font-size:.8rem;letter-spacing:.05em;">RUSSIAN ROULETTE</span><br>`+
+      `<span style="color:#999;font-size:.65rem;display:block;margin-top:5px;">`+
+      `<b style="color:#ffcc44">${esc(victim.name)}</b> phải kéo cò súng vào đầu.<br>`+
+      `Người bắn bi 9 an toàn — người kế tiếp chịu!</span>`;
+  } else {
+    titleHTML=
+      `<span style="font-size:1.3rem;display:block;">❌ Bắn nhầm bi!</span>`+
+      `<span style="font-size:.82rem;color:#aaa;display:block;margin-top:4px;">${esc(victim.name)} phải chịu phạt</span>`;
+    subHTML=
+      `<span style="font-size:1.5rem;">🔫</span><br>`+
+      `<span style="color:#cc4444;font-weight:700;font-size:.8rem;letter-spacing:.05em;">RUSSIAN ROULETTE</span><br>`+
+      `<span style="color:#999;font-size:.65rem;display:block;margin-top:5px;">`+
+      `<b style="color:#ffcc44">${esc(victim.name)}</b> bắn sai bi mục tiêu.<br>`+
+      `Hình phạt: kéo cò súng vào đầu!</span>`;
+  }
+  document.getElementById('rlt-title').innerHTML=titleHTML;
+  document.getElementById('rlt-sub').innerHTML=subHTML;
   cylR.set(G.rlt.cylinder,G.rlt.fired,G.rlt.chamber);cylR.draw();
-  const mine=!p.isBot&&(soloMode||p.id===uid);
-  document.getElementById('pull-btn').disabled=false;
-  document.getElementById('pull-btn').style.display=mine?'':'none';
-  document.getElementById('pull-wait').innerHTML=mine?'':(`${esc(p.name)} đang kéo cò<span class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>`);
-  if(!mine)botTmr=setTimeout(doPull,1400+Math.random()*800);
+  const mine=!victim.isBot&&(soloMode||victim.id===uid);
+  const pullBtn=document.getElementById('pull-btn');
+  pullBtn.disabled=false;
+  pullBtn.style.display=mine?'flex':'none';
+  pullBtn.innerHTML=`🔫<span style="font-size:.58rem;display:block;margin-top:4px;">KÉO CÒ</span>`;
+  const bulletsLeft=G.rlt.cylinder.filter((v,i)=>v&&!G.rlt.fired.includes(i)).length;
+  const total=G.rlt.cylinder.length-G.rlt.fired.length;
+  const pct=total>0?Math.round(bulletsLeft/total*100):0;
+  const chamberInfo=`🔴 ${bulletsLeft} đạn / ${total} ô còn lại — xác suất chết: ${pct}%`;
+  document.getElementById('pull-wait').innerHTML=mine
+    ?`<span style="color:#888;font-size:.62rem;">${chamberInfo}</span>`
+    :`<div style="color:#bbb;font-size:.74rem;margin-bottom:5px;">${esc(victim.name)} đang run rẩy...<span class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span></div><span style="color:#666;font-size:.6rem;">${chamberInfo}</span>`;
+  if(!mine)botTmr=setTimeout(doPull,1800+Math.random()*1000);
 }
 
 async function doPull(){
@@ -827,7 +885,15 @@ async function doPull(){
     hideOv();
     const alive=G.players.filter(pl=>pl.alive);
     if(alive.length<=1){showWin(alive[0]||null);return;}
-    resetBalls();
+    // if ball 9 was the goal (nine-ball roulette), all balls were pocketed — re-rack
+    const ballsLeft=G.balls.filter(b=>!b.pocketed&&b.num!==0).length;
+    if(ballsLeft===0){
+      initBalls();
+      G.currentGoal=1;
+    }else{
+      G.currentGoal=getEffectiveGoal();
+    }
+    renderPoolChips();
     advanceTurn();
   },2200);
 }
