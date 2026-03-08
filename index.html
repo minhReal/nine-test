@@ -736,64 +736,76 @@ function getEffectiveGoal(){
 
 function afterShot(){
   G.shooting=false;
+
   const cue=G.pocketedThisTurn.includes(0);
   if(cue){
     const cb=G.balls[0];cb.pocketed=false;cb.vx=0;cb.vy=0;
     cb.x=CUE_X;cb.y=CUE_Y;
   }
 
-  // auto-advance goal to next existing ball (skip already-pocketed)
+  // save who shot BEFORE any index changes
+  const shooterIdx=G.curIdx;
+  const curP=G.players[shooterIdx];
+
+  // advance goal past balls already pocketed before this shot
   G.currentGoal=getEffectiveGoal();
 
-  const curP=G.players[G.curIdx];
-
-  // find next alive player index
-  function nextAliveIdx(){
-    let n=(G.curIdx+1)%G.players.length,c=0;
+  // helper: next alive player after a given index
+  function nextAliveAfter(idx){
+    let n=(idx+1)%G.players.length,c=0;
     while(!G.players[n].alive&&c<G.players.length){n=(n+1)%G.players.length;c++;}
     return n;
   }
 
+  // --- cue ball pocketed: next player gets ball-in-hand ---
   if(cue){
     G.ballInHand=true;
-    const nextN=nextAliveIdx();
-    const nextP=G.players[nextN];
-    toast(`⚪ Cào bi! ${nextP?nextP.name:''} được đặt bi trắng`);
+    const nextN=nextAliveAfter(shooterIdx);
+    toast(`⚪ Cào bi! ${G.players[nextN]?.name||''} được đặt bi trắng`);
+    G.curIdx=shooterIdx; // keep index so advanceTurn goes to nextN
     advanceTurn();
     return;
   }
 
-  const wrongBall=G.firstHitBall>0&&G.firstHitBall!==G.currentGoal;
+  const goalHit=G.pocketedThisTurn.includes(G.currentGoal);
+
+  // --- check wrong first hit (only penalise if goal was NOT pocketed) ---
+  const wrongBall=!goalHit&&G.firstHitBall>0&&G.firstHitBall!==G.currentGoal;
   if(wrongBall){
-    toast(`❌ ${curP?curP.name:''} bắn nhầm bi! Phải kéo cò...`);
-    G.rltIdx=G.curIdx;G.phase='roulette';
+    toast(`❌ ${curP?.name||''} bắn nhầm bi! Phải kéo cò...`);
+    G.rltIdx=shooterIdx;   // the SHOOTER faces roulette
+    G.phase='roulette';
     renderPoolChips();
-    showRltPhase('wrong');
+    showRltPhase('wrong',null);
     return;
   }
 
-  const goalHit=G.pocketedThisTurn.includes(G.currentGoal);
+  // --- goal ball pocketed ---
   if(goalHit){
     if(curP)curP.score=(curP.score||0)+1;
     if(G.currentGoal===9){
-      // Player who pocketed 9 is SAFE — NEXT player faces roulette
+      // shooter is SAFE — NEXT player faces roulette
       sndGoal();
-      const victim=nextAliveIdx();
-      G.rltIdx=victim;G.phase='roulette';
+      const victimIdx=nextAliveAfter(shooterIdx);
+      G.rltIdx=victimIdx;
+      G.phase='roulette';
       G.currentGoal=1;
-      G.curIdx=victim; // set so showRltPhase knows who it is
+      // curIdx stays as shooterIdx; advanceTurn after doPull will move forward normally
       renderPoolChips();
       showRltPhase('nine',curP);
     }else{
       sndGoal();
       const prev=G.currentGoal;
-      G.currentGoal=getNextGoal(G.currentGoal);
-      G.currentGoal=getEffectiveGoal();
+      // find next ball still on table after prev
+      let next=prev+1;
+      while(next<9&&!G.balls.some(b=>b.num===next&&!b.pocketed))next++;
+      G.currentGoal=next;
       toast(`✅ Bi ${prev} vào lỗ! Tiếp theo: bi số ${G.currentGoal}`);
       renderPoolChips();
       advanceTurn();
     }
   }else{
+    // missed — just next turn
     advanceTurn();
   }
 }
@@ -885,7 +897,8 @@ async function doPull(){
     hideOv();
     const alive=G.players.filter(pl=>pl.alive);
     if(alive.length<=1){showWin(alive[0]||null);return;}
-    // if ball 9 was the goal (nine-ball roulette), all balls were pocketed — re-rack
+    // after roulette, next turn starts from whoever just faced roulette
+    G.curIdx=G.rltIdx;
     const ballsLeft=G.balls.filter(b=>!b.pocketed&&b.num!==0).length;
     if(ballsLeft===0){
       initBalls();
